@@ -13,6 +13,7 @@ char keys[ROWS][COLS] = {
    {'7', '8', '9', 'C'},
    {'*', '0', '#', 'D'}
 };
+int arr[5] = {0, };
 
 void init_keypad()
 {
@@ -69,23 +70,45 @@ char get_key()
     return pressedKey;
 }
 
+PI_THREAD(t1)
+{
+	char prev_key;
+	int cnt = 0;
+	while(1)
+	{
+      char x = get_key();
+
+      if (x != prev_key && x != '\0')
+	  {
+         printf("pressed: %c\n", x);
+		 arr[cnt] = x;
+		 cnt++;
+	  }
+      else
+         continue;
+
+      delay(1);
+	  prev_key = x;
+	  if(cnt==5) break;
+   }
+
+}
 int main()
 {
 	wiringPiSetup();
 	init_keypad();
 	char prev_key;
+		
+	piThreadCreate(t1);
 	while(1)
-   {
-      char x = get_key();
+	{
+		delay(10000);
+		break;
+	}
 
-      if (x != prev_key && x != '\0')
-         printf("pressed: %c\n", x);
-      else
-         continue;
-
-      delay(100);
-	  prev_key = x;
-   }
-
-   return 0;
+	for(int i = 0 ; i < 5 ; i++)
+	{
+		printf("%c ", arr[i]);
+	}
+	return 0;
 }

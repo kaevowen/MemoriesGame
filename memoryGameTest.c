@@ -10,11 +10,14 @@
 #define COLS 4
 #define ROWS 4
 
-
 int prev_mat[2] = {0, };
 int dly = 1000 * 700;
 int difficulty = 0;
-
+int condition = 1;
+int wait_until_marking_all = 1;
+int round_score = 500;
+int tmp_score = 0;
+int total_score = 0;
 int COL_PINS[COLS] = {0, 1, 2, 3}; 
 int ROW_PINS[ROWS] = {22, 23, 24, 25};
 
@@ -27,26 +30,74 @@ char keys[ROWS][COLS] = {
    {'C', 'D', 'E', 'F'}
 };
 
-char answer[5] = {0, };
-
+char cpu_answer[5] = {0, };
+char your_answer[5] = {0, };
 void init_keypad();
 void printMatrix(int (*arr)[COLS]);
 void generateRandomMatrix(int (*arr)[COLS], int n);
+
 char get_key();
 int findLowRow();
+int CalcScore();
+
+PI_THREAD(calcScore)
+{
+	while(condition)
+	{
+		while(round_score)
+		{
+			round_score--;
+			if(round_score <= 0) break;
+			delay(10);
+		}
+		delay(10);
+	}
+}
+
+PI_THREAD(get_keypad_value)
+{
+	int cnt = 0;
+	char prev_key;
+	while(round_score)
+	{
+		char x = get_key();
+
+      	if (x != prev_key && x != '\0')
+		{
+			printf("%c ", x);
+			your_answer[cnt] = x;
+			cnt++;
+		}
+		else
+			continue;
+		
+		prev_key = x;
+		delay(1);
+		if( cnt == 5 )
+		{
+			tmp_score = round_score;
+			wait_until_marking_all = 0;
+			round_score = 0;
+			printf("\n");
+			break;
+		}
+	}
+}
 
 int main()
 {
-	int i;	
 	int mat[COLS][ROWS] = {
 		{0, 0, 0, 0},
 		{0, 0, 0, 0},
 		{0, 0, 0, 0},
 		{0, 0, 0, 0}
 	};
-	srand(time(NULL));
 
-	for(i = 0;i < 5 ; i++)
+	srand(time(NULL));
+	wiringPiSetup();
+	init_keypad();
+
+	for(int i = 0 ; i < 5 ; i++)
 	{
 		refresh();
 		printf("pattern %d\n", i+1);
@@ -55,10 +106,28 @@ int main()
 		usleep(dly);
 	}
 	
+	round_score = 500;
+	piThreadCreate(calcScore);
+	piThreadCreate(get_keypad_value);
+	int correctCnt = 0;
+
+	while(wait_until_marking_all)
+	{
+		delay(10);
+	}
+
 	printf("the answer is ");
-	for(i = 0 ; i < 5 ; i++)
-		printf("%c ", answer[i]);
+	for(int i = 0 ; i < 5 ; i++)
+		printf("%c ", cpu_answer[i]);
 	printf("\n");
+
+	for(int i = 0 ; i < 5 ; i++)
+		if(cpu_answer[i] == your_answer[i])
+				correctCnt++;
+
+	printf("Score : %d * %d(correct answer) = %d\n",
+			tmp_score, correctCnt, tmp_score*correctCnt);
+
 	return 0;
 }
 
@@ -82,9 +151,7 @@ void init_keypad()
 // check ROWS_PINS state and return. if not found return -1
 int findLowRow()
 {
-    int r;
-
-    for (r = 0; r < ROWS; r++)
+    for (int r = 0; r < ROWS; r++)
 	{
         if (digitalRead(ROW_PINS[r]) == LOW)
 			return r;
@@ -96,9 +163,7 @@ int findLowRow()
 char get_key()
 {
 	int rowIndex;
-	int c;
-
-	for (c = 0; c < COLS; c++)
+	for (int c = 0; c < COLS; c++)
 	{
 		digitalWrite(COL_PINS[c], LOW);
 		rowIndex = findLowRow();
@@ -123,25 +188,24 @@ char get_key()
 // filled random array value into 1
 void generateRandomMatrix(int (*arr)[COLS], int n)
 {
-	int f = rand() % COLS;
-	int s = rand() % ROWS;
-	int i, j;
+	int x = rand() % COLS;
+	int y = rand() % ROWS;
 
 	// clear array
-	for(i = 0 ; i < COLS ; i++)
-		for(j = 0 ; j < ROWS ; j++)
+	for(int i = 0 ; i < COLS ; i++)
+		for(int j = 0 ; j < ROWS ; j++)
 			arr[i][j] = 0;
 	
 	// if current value was same as previous value, callback himself
-	if(f == prev_mat[0] && s == prev_mat[1])
+	if(x == prev_mat[0] && y == prev_mat[1])
 		generateRandomMatrix(arr, n);
 
 	else
 	{
-		arr[f][s] = 1;
-		answer[n] = keys[f][s];
-		prev_mat[0] = f;
-		prev_mat[1] = s;
+		arr[x][y] = 1;
+		cpu_answer[n] = keys[x][y];
+		prev_mat[0] = x;
+		prev_mat[1] = y;
 	}
 }
 
@@ -153,12 +217,9 @@ void printMatrix(int (*arr)[COLS])
 	for(i = 0 ; i < COLS ; i++)
 	{
 		for(j = 0 ; j < ROWS ; j++)
-		{
 			arr[i][j] == 1 ? printf("■ ") : printf("□ ");
-		}
+
 		puts("");
 	}
 		
 }
-
-
