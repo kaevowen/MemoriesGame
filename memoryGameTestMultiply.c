@@ -13,17 +13,23 @@
 int prev_mat[2] = {0, };
 int dly = 1000 * 1000;
 int difficulty = 0;
+int i = 0;
 
 int COL_PINS[COLS] = {0, 1, 2, 3}; 
 int ROW_PINS[ROWS] = {22, 23, 24, 25};
 
 char pressedKey = '\0';
 
-char keys[ROWS][COLS] = { 
-   {'1', '2', '3', '4'},
-   {'5', '6', '7', '8'},
-   {'9', '0', 'A', 'B'},
-   {'C', 'D', 'E', 'F'}
+//keys matrix refigured in 8 x 8 formation
+char keys[8][8] = { 
+   {'1', '0', '2', '0', '3', '0', '4', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+   {'5', '0', '6', '0', '7', '0', '8', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+   {'9', '0', '0', '0', 'A', '0', 'B', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+   {'C', '0', 'D', '0', 'E', '0', 'F', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
 };
 
 char answer[5] = {0, };
@@ -49,7 +55,7 @@ int main()
 	};
 	srand(time(NULL));
 
-	for(i = 0 ; i < 1 ; i++)
+	for(i = 0 ; i < 5 ; i++)
 	{
 		refresh();
 		printf("\t\t\tpattern %d\n", i+1);
@@ -114,8 +120,8 @@ char get_key()
 // filled random array value into 1
 void generateRandomMatrix(int (*arr)[COLS*2], int n)
 {
-	int ori_x = rand() % (COLS+2);
-	int ori_y = rand() % (ROWS+2);
+	int ori_x = rand() % (COLS + 2);
+	int ori_y = rand() % (ROWS + 2);
 	int mul_x = 0, mul_y = 0;
 
 	// clear array
@@ -138,6 +144,10 @@ void generateRandomMatrix(int (*arr)[COLS*2], int n)
 		arr[mul_y+1][mul_x]   = 1;
 		arr[mul_y+1][mul_x+1] = 1;
 		
+		//Saving return values from keys matrix to answer[] referenced by arguments mul_y, mul_x
+		answer[i] = keys[mul_y][mul_x];
+		
+		/*
 		if(mul_x == 0)
 		{
 			answer[n] = keys[ori_y][ori_x];
@@ -150,11 +160,15 @@ void generateRandomMatrix(int (*arr)[COLS*2], int n)
 		{
 			answer[n] = keys[ori_y-1][ori_x-1];
 		}
-
+		*/
+		
 		prev_mat[0] = ori_y;
 		prev_mat[1] = ori_x;
-	printf("ori_x : %d, ori_y : %d\n", ori_x, ori_y);
+		printf("ori_x : %d, ori_y : %d\n", ori_x, ori_y);
 		printf("mul_x : %d, mul_y : %d\n", mul_x, mul_y);
+		//printf("answer is %c\n", answer[i]);
+		//Global variable for counter 'i' increases
+		i++;
 	}
 }
 
@@ -175,5 +189,6 @@ void printMatrix(int (*arr)[COLS*2])
 	}
 		
 }
+
 
 

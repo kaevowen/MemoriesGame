@@ -20,23 +20,32 @@ int tmp_score = 0;
 int total_score = 0;
 int COL_PINS[COLS] = {0, 1, 2, 3}; 
 int ROW_PINS[ROWS] = {22, 23, 24, 25};
-
+char answer[5] = {0, };
 char pressedKey = '\0';
-
-
+/*
 char keys[ROWS][COLS] = { 
    {'1', '2', '3', '4'},
    {'5', '6', '7', '8'},
    {'9', '0', 'A', 'B'},
    {'C', 'D', 'E', 'F'}
 };
-
+*/
+char keys[8][8] = { 
+   {'1', '0', '2', '0', '3', '0', '4', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+   {'5', '0', '6', '0', '7', '0', '8', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+   {'9', '0', '0', '0', 'A', '0', 'B', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+   {'C', '0', 'D', '0', 'E', '0', 'F', '0'},
+   {'0', '0', '0', '0', '0', '0', '0', '0'},
+};
 
 char cpu_answer[5] = {0, };
 char your_answer[5] = {0, };
 void init_keypad();
-void printMatrix(int (*arr)[COLS]);
-void generateRandomMatrix(int (*arr)[COLS], int n);
+void printMatrix(int (*arr)[COLS*2]);
+void generateRandomMatrix(int (*arr)[COLS*2], int n);
 
 char get_key();
 int findLowRow();
@@ -71,8 +80,8 @@ PI_THREAD(get_keypad_value)
 		else
 			continue;
 		
-		printf("%c %c ", x, prev_key);
 		prev_key = x;
+		printf("%c %c ", x, prev_key);
 		delay(100);
 
 		if( cnt >= 5 )
@@ -88,11 +97,15 @@ PI_THREAD(get_keypad_value)
 
 int main()
 {
-	int mat[COLS][ROWS] = {
-		{0, 0, 0, 0},
-		{0, 0, 0, 0},
-		{0, 0, 0, 0},
-		{0, 0, 0, 0},
+	int mat[COLS*2][ROWS*2] = {
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0}
 	};
 
 	srand(time(NULL));
@@ -186,39 +199,68 @@ char get_key()
 
     return pressedKey;
 }
-
 // filled random array value into 1
-void generateRandomMatrix(int (*arr)[COLS], int n)
+void generateRandomMatrix(int (*arr)[COLS*2], int n)
 {
-	int x = rand() % COLS;
-	int y = rand() % ROWS;
+	int ori_x = rand() % (COLS + 2);
+	int ori_y = rand() % (ROWS + 2);
+	int mul_x = 0, mul_y = 0;
 
 	// clear array
-	for(int i = 0 ; i < COLS ; i++)
-		for(int j = 0 ; j < ROWS ; j++)
+	for(int i = 0 ; i < COLS * 2 ; i++)
+		for(int j = 0 ; j < ROWS * 2 ; j++)
 			arr[i][j] = 0;
-	
-	// if current value was same as previous value, callback himself
-	if(y == prev_mat[0] && x == prev_mat[1])
-		generateRandomMatrix(arr, n);
 
+	printf("prev_mat_x : %d, prev_mat_y : %d\n", 
+			prev_mat[0], prev_mat[1]);
+	// if current value was same as previous value, callback himself
+	if(ori_x == prev_mat[0] && ori_y == prev_mat[1])
+		generateRandomMatrix(arr, n);
 	else
 	{
-		arr[y][x] = 1;
-		cpu_answer[n] = keys[y][x];
-		prev_mat[0] = y;
-		prev_mat[1] = x;	
+		mul_x = ori_x % 2 == 1 ? (ori_x+=1) : (ori_x+=0);
+		mul_y = ori_y % 2 == 1 ? (ori_y+=1) : (ori_x+=0);
+
+		arr[mul_y][mul_x]     = 1;
+		arr[mul_y][mul_x+1]   = 1;
+		arr[mul_y+1][mul_x]   = 1;
+		arr[mul_y+1][mul_x+1] = 1;
+		
+		//Saving return values from keys matrix to answer[] referenced by arguments mul_y, mul_x
+		answer[n] = keys[mul_y][mul_x];
+		
+		/*
+		if(mul_x == 0)
+		{
+			answer[n] = keys[ori_y][ori_x];
+		}
+		else if (mul_x == 6)
+		{
+			answer[n] = keys[ori_y-2][ori_x-2];
+		}
+		else
+		{
+			answer[n] = keys[ori_y-1][ori_x-1];
+		}
+		*/
+		
+		prev_mat[0] = ori_y;
+		prev_mat[1] = ori_x;
+		printf("ori_x : %d, ori_y : %d\n", ori_x, ori_y);
+		printf("mul_x : %d, mul_y : %d\n", mul_x, mul_y);
+		//printf("answer is %c\n", answer[i]);
+		//Global variable for counter 'i' increases
 	}
 }
 
-void printMatrix(int (*arr)[COLS])
+void printMatrix(int (*arr)[COLS*2])
 {	
 	// ■□
 	// filled black square if array value is 1
 	int i, j = 0 ;
-	for(i = 0 ; i < COLS ; i++)
+	for(i = 0 ; i < COLS*2 ; i++)
 	{
-		for(j = 0 ; j < ROWS ; j++)
+		for(j = 0 ; j < ROWS*2 ; j++)
 			arr[i][j] == 1 ? printf("■ ") : printf("□ ");
 
 		puts("");
