@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
+
 
 void printMainScreen()
 {
@@ -17,11 +20,7 @@ void printMainScreen()
 	printf("                                        [Press Enter to Start game]                                                   \n");
 	printf("                                                                                                                      \n");
 	printf("                                       [Press L to Open Leader board]                                                 \n");
-}
+	printf("                                           [Press Q to exit game]                                                 \n");
 
 
-int main()
-{
-	printMainScreen();	
-	return 0;
 }

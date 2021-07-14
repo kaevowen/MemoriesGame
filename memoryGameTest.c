@@ -3,6 +3,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <wiringPi.h>
+#include <termios.h>
+
+#include "mainScreen.h"
 
 // clear screen macro
 #define refresh() printf("\033[H\033[J")
@@ -11,7 +14,7 @@
 #define ROWS 4
 
 int prev_mat[2] = {0, };
-int dly = 1000 * 700;
+int dly = 1000 * 1000;
 int difficulty = 0;
 int condition = 1;
 int wait_until_marking_all = 1;
@@ -22,8 +25,6 @@ int COL_PINS[COLS] = {0, 1, 2, 3};
 int ROW_PINS[ROWS] = {22, 23, 24, 25};
 
 char pressedKey = '\0';
-
-
 char keys[ROWS][COLS] = { 
    {'1', '2', '3', '4'},
    {'5', '6', '7', '8'},
@@ -31,9 +32,9 @@ char keys[ROWS][COLS] = {
    {'C', 'D', 'E', 'F'}
 };
 
+char cpu_answer[8] = {0, };
+char your_answer[8] = {0, };
 
-char cpu_answer[5] = {0, };
-char your_answer[5] = {0, };
 void init_keypad();
 void printMatrix(int (*arr)[COLS]);
 void generateRandomMatrix(int (*arr)[COLS], int n);
@@ -41,16 +42,17 @@ void generateRandomMatrix(int (*arr)[COLS], int n);
 char get_key();
 int findLowRow();
 int CalcScore();
+int getch();
 
 PI_THREAD(calcScore)
 {
-	while(condition)
+	while(1)
 	{
 		while(round_score)
 		{
 			round_score--;
 			if(round_score <= 0) break;
-			delay(10);
+			delay(50);
 		}
 		delay(100);
 	}
@@ -60,29 +62,35 @@ PI_THREAD(get_keypad_value)
 {
 	int cnt = 0;
 	char prev_key;
-	while(round_score)
+	char x;
+
+	while(condition)
 	{
-		char x = get_key();
-
-      	if (x != prev_key && x != '\0')
+		cnt = 0;
+		while(round_score)
 		{
-			your_answer[cnt++] = x;
-		}
-		else
-			continue;
+			x = get_key();
+
+	      	if (x != prev_key && x != '\0')
+				your_answer[cnt++] = x;
+
+			else
+				continue;
 		
-		printf("%c %c ", x, prev_key);
-		prev_key = x;
-		delay(100);
+			prev_key = x;
+			delay(50);
 
-		if( cnt >= 5 )
-		{
-			tmp_score = round_score;
-			wait_until_marking_all = 0;
-			round_score = 0;
-			printf("\n");
-			break;
+			if( cnt >= difficulty+4 )
+			{
+				tmp_score = round_score;
+				wait_until_marking_all = 0;
+				round_score = 0;
+				printf("\n");
+				break;
+			}
 		}
+
+		delay(100);
 	}
 }
 
@@ -99,37 +107,75 @@ int main()
 	wiringPiSetup();
 	init_keypad();
 
-	for(int i = 0 ; i < 5 ; i++)
-	{
-		refresh();
-		printf("pattern %d\n", i+1);
-		generateRandomMatrix(mat, i);
-		printMatrix(mat);
-		usleep(dly);
-	}
-	
-	round_score = 500;
 	piThreadCreate(calcScore);
 	piThreadCreate(get_keypad_value);
-	int correctCnt = 0;
 	
-	while(wait_until_marking_all)
+	while(1)
 	{
-		delay(10);
+		refresh();
+		printMainScreen();
+		int command = getch();
+		if(command == 10)
+			break;
+		else if(command == 80 || command == 113)
+			return 0;
 	}
 	
-	printf("the answer is ");
-	for(int i = 0 ; i < 5 ; i++)
-		printf("%c ", cpu_answer[i]);
-	printf("\n");
+	refresh();
+	printf("Select Difficulty\n");
+	printf("1. easy\n");
+	printf("2. normal\n");
+	printf("3. hard\n");
+	printf("4. hell\n");
+	difficulty = getch() - '0';
+	dly = 1000 * 1000 / difficulty;
 
-	for(int i = 0 ; i < 5 ; i++)
-		if(cpu_answer[i] == your_answer[i])
-			correctCnt++;
+	for(int r = 0 ; r < 10 ; r++)
+	{
+		refresh();
+		wait_until_marking_all = 1;
+		printf("ROUND %d\n", r+1);
+		delay(1000);
 
-	printf("Score : %d * %d(correct answer) = %d\n",
-			tmp_score, correctCnt, tmp_score*correctCnt);
+		for(int i = 0 ; i < difficulty+4 ; i++)
+		{
+			refresh();
+			printf("pattern %d\n", i+1);
+			generateRandomMatrix(mat, i);
+			printMatrix(mat);
+			usleep(dly);
+		}
+		
+		refresh();
+		round_score = 500;
+		int correctCnt = 0;
+	
+		while(wait_until_marking_all)
+		{
+			delay(10);
+		}
+		printf("your answer ");
+		for(int i = 0 ; i < difficulty+4 ; i++)
+			printf("%c ", your_answer[i]);
+		printf("\n");
 
+		printf("the answer is ");
+		for(int i = 0 ; i < difficulty+4 ; i++)
+			printf("%c ", cpu_answer[i]);
+		printf("\n");
+
+		for(int i = 0 ; i < difficulty+4 ; i++)
+			if(cpu_answer[i] == your_answer[i])
+				correctCnt++;
+
+		printf("Score : %d * %d(correct answer) = %d\n",
+				tmp_score, correctCnt, tmp_score*correctCnt) ;
+		total_score = total_score + ( tmp_score * correctCnt ) ;
+
+		sleep(3);
+	}
+
+	printf("total score : %d\n", total_score);
 	return 0;
 }
 
@@ -225,3 +271,20 @@ void printMatrix(int (*arr)[COLS])
 	}
 		
 }
+
+int getch()
+{
+    int c;
+    struct termios oldattr, newattr;
+    tcgetattr(STDIN_FILENO, &oldattr);
+    newattr = oldattr;
+    newattr.c_lflag &= ~(ICANON | ECHO);
+    newattr.c_cc[VMIN] = 1;
+    newattr.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newattr);
+    c = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &newattr);
+
+    return c;
+}
+
